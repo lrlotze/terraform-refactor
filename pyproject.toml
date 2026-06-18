@@ -1,0 +1,15 @@
+[project]
+name = "terraform-refactor"
+version = "0.1.0"
+description = "AI-assisted Terraform refactoring tool for imported HCL code."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "python-hcl2>=3.0.0",
+  "openai>=1.0.0"
+]
+authors = [
+  { name = "Terraform Refactor Team" }
+]
+[project.scripts]
+terraform-refactor = "terraform_refactor.cli:main"
