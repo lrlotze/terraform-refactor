@@ -1,5 +1,5 @@
 # terraform-refactor
-AI refactoring tool to convert imported .tf files into proper Terraform IaC
+AI refactoring tool to convert imported .tf files into proper Terraform IaC. Made for the 2026 IBM Austin Bobathon.
 
 # Use Case & Features
 Importing external infrastructure into Terraform can be complicated, especially if the project is highly complex or insufficiently documented. The imported files are often bloated and inefficient, particularly after manual editing. This tool analyzes import files and cleans them up by:
