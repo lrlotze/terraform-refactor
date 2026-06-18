@@ -37,40 +37,56 @@ This tool transforms that output into clean, split `.tf` files that `terraform p
 
 ## How It Works
 
-The engine runs a staged, **deterministic** pipeline:
+The full flow produces three runtime artifacts that do not exist in the repo — they are created on each run:
+
+| Path | Created by | Purpose |
+|---|---|---|
+| `generated/` | Terraformer | Raw per-resource-type directories, each with its own `.tf`, `variables.tf`, `outputs.tf`, `provider.tf`, and `terraform.tfstate` files |
+| `generated/generated.tf` | Pre-processing step | Single merged `.tf` file built by concatenating all resource files from `generated/` — this is the engine's input |
+| `output/` | This engine | Clean, split, production-ready `.tf` files (one per logical group) plus a merged `terraform.tfstate` |
+
+The engine itself runs a staged, **deterministic** pipeline against `generated.tf`:
 
 ```
-generated.tf
+generated/aws/**/*.tf  (Terraformer raw output)
+  → merge             cat resource files → generated/generated.tf
   → [1] Parse          HCL → typed Python object model
   → [2] Denoise        remove Terraformer artifacts (duplicates, outputs, remote-state refs)
   → [3] Strip defaults remove attributes whose values exactly match provider defaults
   → [4] Group          assign each resource to a logical file (networking, compute, ...)
-  → [5] Emit           write one clean .tf file per group
-  → [6] State          (optional) merge per-module .tfstate files into a single terraform.tfstate
+  → [5] Emit           write one clean .tf file per group → output/
+  → [6] State          merge per-module .tfstate files → output/terraform.tfstate
 ```
 
-**Key principle: `SAFETY > CORRECTNESS > CLEANLINESS`**  
+**Key principle: `SAFETY > CORRECTNESS > CLEANLINESS`**
 If there is any uncertainty about whether an attribute is safe to remove, it is preserved.
 
 ## Usage
 
+**Step 1 — Run Terraformer** to import live AWS infrastructure into `generated/`:
 ```bash
-python3 engine/main.py <input.tf> <output_dir>
-
-# Also merge Terraformer state files so terraform plan works immediately
-python3 engine/main.py <input.tf> <output_dir> --state-dir <terraformer_generated_dir>
-
-# Dry-run (prints plan without writing files)
-python3 engine/main.py <input.tf> <output_dir> --dry-run
-
-# Run against the included example
-python3 engine/main.py examples/aws-basic/generated.tf examples/aws-basic/output \
-  --state-dir examples/aws-basic/generated/aws
+terraformer import aws --resources=vpc,subnet,igw,ec2_instance,sg,route_table \
+  --regions=us-east-1 --path-output=./generated
 ```
 
-After running, validate and format:
+**Step 2 — Merge** the Terraformer resource files into a single input file:
 ```bash
-cd examples/aws-basic/output
+find ./generated/aws -name "*.tf" \
+  -not -name "variables.tf" -not -name "outputs.tf" -not -name "provider.tf" \
+  | sort | xargs cat > ./generated/generated.tf
+```
+
+**Step 3 — Run the engine** to produce clean IaC in `output/`:
+```bash
+python3 engine/main.py ./generated/generated.tf ./output --state-dir ./generated/aws
+
+# Dry-run (prints plan without writing files)
+python3 engine/main.py ./generated/generated.tf ./output --dry-run
+```
+
+**Step 4 — Validate:**
+```bash
+cd ./output
 terraform fmt .
 terraform init
 terraform plan   # should show: No changes.
@@ -80,7 +96,7 @@ terraform plan   # should show: No changes.
 
 | File | Contents |
 |---|---|
-| `provider.tf` | Single `provider "aws"` + `terraform {}` block |
+| `provider.tf` | `provider "aws"` and `terraform {}` blocks (de-duplicated) |
 | `networking.tf` | VPCs, subnets, internet gateways, route tables, security groups |
 | `compute.tf` | EC2 instances, launch templates, autoscaling groups |
 | `storage.tf` | S3 buckets, EBS volumes |
@@ -88,6 +104,8 @@ terraform plan   # should show: No changes.
 | `iam.tf` | IAM roles, policies, instance profiles |
 | `dns.tf` | Route53 zones and records |
 | `lb.tf` | Load balancers, target groups, listeners |
+| `monitoring.tf` | CloudWatch alarms, log groups, SNS topics |
+| `secrets.tf` | Secrets Manager and SSM Parameter Store resources |
 | `misc.tf` | Any resource type not in the grouping map (fallback) |
 
 Only files with at least one resource are written.
@@ -102,6 +120,9 @@ Only files with at least one resource are written.
 - `primary_network_interface` nested block on `aws_instance` — computed, hard-coded ENI ID
 - `placement_partition_number` on `aws_instance` — read-only computed attribute
 
+### AWS provider v5 deprecated attributes (always removed)
+- `enable_classiclink` and `enable_classiclink_dns_support` on `aws_vpc` — removed in provider v5, Terraformer still emits them
+
 ### Default values (removed only when exactly matching registry)
 Cross-referenced against [`engine/defaults_registry.json`](engine/defaults_registry.json):
 
@@ -109,7 +130,7 @@ Cross-referenced against [`engine/defaults_registry.json`](engine/defaults_regis
 |---|---|
 | `aws_subnet` | `assign_ipv6_address_on_creation`, `enable_dns64`, `enable_lni_at_device_index`, `enable_resource_name_dns_a_record_on_launch`, `enable_resource_name_dns_aaaa_record_on_launch`, `ipv6_native`, `map_customer_owned_ip_on_launch`, `private_dns_hostname_type_on_launch` |
 | `aws_vpc` | `assign_generated_ipv6_cidr_block`, `enable_dns_support`, `enable_dns_hostnames` (if false), `enable_network_address_usage_metrics`, `instance_tenancy`, `ipv6_netmask_length` |
-| `aws_instance` | `disable_api_stop/termination`, `ebs_optimized`, `get_password_data`, `hibernation`, `instance_initiated_shutdown_behavior`, `ipv6_address_count`, `monitoring`, `source_dest_check`, `tenancy`; nested: `capacity_reservation_specification`, `enclave_options`, `maintenance_options`, `metadata_options`, `private_dns_name_options`, `root_block_device` (partial) |
+| `aws_instance` | `disable_api_stop/termination`, `ebs_optimized`, `get_password_data`, `hibernation`, `instance_initiated_shutdown_behavior`, `ipv6_address_count`, `monitoring`, `source_dest_check`, `tenancy`; `cpu_core_count`/`cpu_threads_per_core` (when `cpu_options` block present); nested: `capacity_reservation_specification`, `enclave_options`, `maintenance_options`, `metadata_options`, `private_dns_name_options`, `root_block_device` (partial) |
 | Any resource | `region` (when matches provider region — always a Terraformer artifact) |
 
 ## What Is Preserved (by design)
@@ -134,17 +155,20 @@ engine/                      Python package — the refactoring pipeline
   registry.py                Loads defaults_registry.json, type-aware is_default()
   grouper.py                 Static RESOURCE_GROUP_MAP + group assignment
   emitter.py                 Renders groups to .tf files
-  state_merger.py            Merges Terraformer v3 state files into a single v4 state
+  state_merger.py            Merges Terraformer v3/v4 state files into a single v4 state
   defaults_registry.json     Curated defaults: resource_type → attribute → default_value
 
 tests/
   test_pipeline.py           71 correctness assertions against the aws-basic example
+                             (requires examples/aws-basic/generated.tf and
+                             examples/aws-basic/output/ — see Testing)
 
 examples/
   aws-basic/
-    generated.tf             Messy Terraformer input (test fixture)
     main.tf                  Hand-written reference showing minimal clean config
-    generated/aws/           Terraformer per-module state files (source of truth for IDs)
+    generated.tf             (runtime) merged Terraformer input — produced by merge step
+    generated/aws/           (runtime) raw Terraformer output — produced by Terraformer
+    output/                  (runtime) refactored output — produced by the engine
 ```
 
 ## Extending the Defaults Registry
@@ -160,7 +184,7 @@ Edit [`engine/defaults_registry.json`](engine/defaults_registry.json) to add cov
 }
 ```
 
-Values must be Python-native types: `true`/`false` for booleans, numbers without quotes, strings with quotes. Cross-check every entry against the [Terraform AWS provider docs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs) before adding.
+Values must be standard JSON types: `true`/`false` for booleans, numbers without quotes, strings with quotes. Cross-check every entry against the [Terraform AWS provider docs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs) before adding.
 
 ## Extending the Grouping Map
 
@@ -168,12 +192,19 @@ Edit `RESOURCE_GROUP_MAP` in [`engine/grouper.py`](engine/grouper.py) to add new
 
 ## Testing
 
+The test suite runs against the `examples/aws-basic/` fixture. The required input files (`examples/aws-basic/generated.tf` and `examples/aws-basic/generated/aws/`) are runtime artifacts — produce them by running Terraformer with `--path-output=./examples/aws-basic/generated`, then run the merge and engine steps (see [Usage](#usage)) targeting `examples/aws-basic/` paths:
+
 ```bash
-# Run the pipeline against the included example
+# 1. Merge Terraformer output into examples/aws-basic/generated.tf
+find ./examples/aws-basic/generated/aws -name "*.tf" \
+  -not -name "variables.tf" -not -name "outputs.tf" -not -name "provider.tf" \
+  | sort | xargs cat > examples/aws-basic/generated.tf
+
+# 2. Run the engine
 python3 engine/main.py examples/aws-basic/generated.tf examples/aws-basic/output \
   --state-dir examples/aws-basic/generated/aws
 
-# Run the correctness test suite (71 assertions)
+# 3. Run the correctness test suite (71 assertions)
 python3 tests/test_pipeline.py
 ```
 
