@@ -44,6 +44,7 @@ class ResourceBlock:
 class ProviderBlock:
     provider_name: str                       # e.g. "aws"
     attributes: dict[str, Attribute] = field(default_factory=dict)
+    nested_blocks: list["NestedBlock"] = field(default_factory=list)
 
 
 @dataclass
@@ -409,8 +410,8 @@ def _parse_block(raw: str) -> Block | None:
         )
 
     if block_type == "provider" and len(labels) >= 1:
-        attrs, _ = _parse_attributes_and_nested(body)
-        return ProviderBlock(provider_name=labels[0], attributes=attrs)
+        attrs, nested = _parse_attributes_and_nested(body)
+        return ProviderBlock(provider_name=labels[0], attributes=attrs, nested_blocks=nested)
 
     if block_type == "terraform":
         # Preserve terraform block verbatim — it contains required_providers with
@@ -515,6 +516,8 @@ def render_block(block: Block) -> str:
         lines = [f'provider "{block.provider_name}" {{']
         for attr in block.attributes.values():
             lines.append(f"  {attr.key} = {_render_value(attr)}")
+        for nb in block.nested_blocks:
+            lines.append(render_nested_block(nb, indent=2))
         lines.append("}")
         return "\n".join(lines)
 

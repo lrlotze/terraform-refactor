@@ -41,6 +41,31 @@ def _find_state_files(state_dir: str) -> list[str]:
     return sorted(found)
 
 
+# Map of resource type prefix → Terraform registry provider path.
+# Extend when adding support for additional providers.
+_PROVIDER_REGISTRY: dict[str, str] = {
+    "aws":     "registry.terraform.io/hashicorp/aws",
+    "azurerm": "registry.terraform.io/hashicorp/azurerm",
+    "google":  "registry.terraform.io/hashicorp/google",
+    "azuread": "registry.terraform.io/hashicorp/azuread",
+}
+
+
+def _provider_string_for_type(resource_type: str) -> str:
+    """
+    Return the canonical Terraform v4 provider string for a given resource type.
+
+    e.g.  "aws_vpc"                      → 'provider["registry.terraform.io/hashicorp/aws"]'
+          "azurerm_linux_virtual_machine" → 'provider["registry.terraform.io/hashicorp/azurerm"]'
+
+    Falls back to the "aws" provider for unrecognised prefixes to preserve
+    prior behaviour rather than silently producing a broken state file.
+    """
+    prefix = resource_type.split("_")[0]
+    registry_path = _PROVIDER_REGISTRY.get(prefix, _PROVIDER_REGISTRY["aws"])
+    return f'provider["{registry_path}"]'
+
+
 def _extract_v3_resources(state: dict) -> list[dict]:
     """
     Extract resource entries from a v3 state file.
@@ -88,17 +113,22 @@ def _extract_v3_resources(state: dict) -> list[dict]:
             attributes = primary.get("attributes", {})
             schema_version = primary.get("meta", {}).get("schema_version", 0)
 
+            # Derive the correct provider registry path from the resource type prefix.
+            # Terraformer v3 state stores a provider string like "provider.aws" which
+            # is too old to use directly in a v4 state file.
+            provider_str = _provider_string_for_type(resource_type)
+
             v4_resource = {
                 "mode": "managed",
                 "type": resource_type,
                 "name": resource_name,
-                "provider": 'provider["registry.terraform.io/hashicorp/aws"]',
+                "provider": provider_str,
                 "instances": [
                     {
                         "schema_version": schema_version,
                         "attributes": attributes,
                         "sensitive_attributes": [],
-                        "private": "",
+                        "private": None,
                     }
                 ],
             }
@@ -110,9 +140,16 @@ def _extract_v3_resources(state: dict) -> list[dict]:
 def _extract_v4_resources(state: dict) -> list[dict]:
     """
     Extract resource entries from a v4 state file.
-    Returns them as-is (already in the right format).
+    Normalises the provider string so that old-format provider strings
+    emitted by some Terraformer builds (e.g. 'provider.azurerm') are
+    replaced with the canonical v4 format.
     """
-    return state.get("resources", [])
+    resources = state.get("resources", [])
+    for res in resources:
+        rtype = res.get("type", "")
+        if rtype:
+            res["provider"] = _provider_string_for_type(rtype)
+    return resources
 
 
 def merge_state_files(state_dir: str, output_path: str) -> int:
