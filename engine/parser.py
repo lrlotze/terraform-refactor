@@ -185,14 +185,8 @@ def _extract_blocks(text: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Attribute line parser
+# Attribute and nested-block parser
 # ---------------------------------------------------------------------------
-
-_ATTR_RE = re.compile(
-    r"""^\s*([a-zA-Z_][a-zA-Z0-9_-]*)\s*=\s*(.+?)\s*$""",
-    re.DOTALL
-)
-
 
 def _parse_attributes_and_nested(body: str) -> tuple[dict[str, Attribute], list[NestedBlock]]:
     """
@@ -208,9 +202,6 @@ def _parse_attributes_and_nested(body: str) -> tuple[dict[str, Attribute], list[
     attributes: dict[str, Attribute] = {}
     nested_blocks: list[NestedBlock] = []
 
-    i = 0
-    lines = body.split("\n")
-    # Rejoin so we can handle multi-line constructs; we'll scan char-by-char
     text = body
     pos = 0
     n = len(text)

@@ -54,7 +54,7 @@ def is_default(resource_type: str, attr_path: str, typed_value: Any) -> bool:
         default_val = resource_defaults[attr_path]
 
         # Strict type + value equality — no cross-type coercion here.
-        # The parser already coerced typed_value; registry stores Python natives.
+        # The parser coerces typed_value to Python types; registry stores JSON-native types.
         # bool must be checked before int because isinstance(True, int) is True in Python.
         if type(default_val) != type(typed_value):
             return False

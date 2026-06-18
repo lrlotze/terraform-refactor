@@ -168,23 +168,12 @@ terraform init
 terraform plan   # should show: No changes.
 ```
 
-## Step 8 — Run the test suite (if available)
-
-If `tests/test_pipeline.py` exists in the workspace, offer to run it:
-
-```bash
-python3 tests/test_pipeline.py
-```
-
-Report pass/fail count.
-
 ## Notes
 
 - Never edit the input file — the engine only reads it
 - If the engine errors, read the error, diagnose the cause (likely a parsing edge case), and report it clearly
 - The output directory is safe to re-run into — files are overwritten each time
-- `provider.tf` is not written by the engine — the user must create their own with the correct
-  region and version constraints before running `terraform plan`
+- `provider.tf` is written by the engine if the input contains provider or terraform blocks (which Terraformer always emits)
 SKILL_EOF
 
 echo "✓ Skill written:    ${BOB_SKILLS_DIR}/tf-refactor/SKILL.md"
