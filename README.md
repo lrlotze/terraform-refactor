@@ -2,6 +2,8 @@
 
 A deterministic Terraform refactoring engine that transforms noisy, Terraformer-generated `.tf` files into clean, modular, production-ready Terraform configuration — **without changing infrastructure behavior**.
 
+Supports both **AWS** (`hashicorp/aws`) and **Azure** (`hashicorp/azurerm`) providers.
+
 ## Install (Bob AI skills)
 
 Install once, then use from any workspace by telling Bob *"convert my AWS infrastructure to Terraform"* or *"refactor my generated.tf"*.
@@ -17,11 +19,11 @@ This installs two Bob skills globally (`~/.bob/skills/`):
 | Skill | Trigger phrase | What it does |
 |---|---|---|
 | `aws-to-iac` | *"convert my AWS to Terraform"* | Runs Terraformer against live AWS, then refactors the output to clean IaC |
-| `tf-refactor` | *"refactor my generated.tf"* | Refactors existing Terraformer output you already have |
+| `tf-refactor` | *"refactor my generated.tf"* | Refactors existing Terraformer output you already have (AWS or Azure) |
 
 The engine is symlinked from the cloned repo — run `git pull` at any time to pick up updates. No reinstall needed.
 
-**Prerequisites:** `python3`, `terraform`, `terraformer`, AWS credentials configured.
+**Prerequisites:** `python3`, `terraform`, `terraformer`, cloud credentials configured (AWS or Azure).
 
 ## Use Case
 
@@ -30,7 +32,7 @@ Importing external infrastructure into Terraform (e.g. via [Terraformer](https:/
 - Duplicate `provider` and `terraform` blocks (one per resource type)
 - `output` blocks for every resource ID (cross-module Terraformer exports)
 - `data "terraform_remote_state"` cross-references between split modules
-- Hard-coded AWS resource IDs in computed attributes
+- Hard-coded cloud resource IDs in computed attributes
 - All resources in a single flat file with no logical organization
 
 This tool transforms that output into clean, split `.tf` files that `terraform plan` will verify produce **zero infrastructure changes**.
@@ -48,7 +50,7 @@ The full flow produces three runtime artifacts that do not exist in the repo —
 The engine itself runs a staged, **deterministic** pipeline against `generated.tf`:
 
 ```
-generated/aws/**/*.tf  (Terraformer raw output)
+generated/<provider>/**/*.tf  (Terraformer raw output)
   → merge             cat resource files → generated/generated.tf
   → [1] Parse          HCL → typed Python object model
   → [2] Denoise        remove Terraformer artifacts (duplicates, outputs, remote-state refs)
@@ -62,6 +64,8 @@ generated/aws/**/*.tf  (Terraformer raw output)
 If there is any uncertainty about whether an attribute is safe to remove, it is preserved.
 
 ## Usage
+
+### AWS
 
 **Step 1 — Run Terraformer** to import live AWS infrastructure into `generated/`:
 ```bash
@@ -92,7 +96,40 @@ terraform init
 terraform plan   # should show: No changes.
 ```
 
+### Azure
+
+**Step 1 — Run Terraformer** to import live Azure infrastructure into `generated/`:
+```bash
+# Authenticate first
+az login
+
+terraformer import azure --resources=resource_group,virtual_network,subnet,virtual_machine,network_interface,network_security_group \
+  --regions=eastus --path-output=./generated
+```
+
+**Step 2 — Merge** the Terraformer resource files:
+```bash
+find ./generated/azurerm -name "*.tf" \
+  -not -name "variables.tf" -not -name "outputs.tf" -not -name "provider.tf" \
+  | sort | xargs cat > ./generated/generated.tf
+```
+
+**Step 3 — Run the engine:**
+```bash
+python3 engine/main.py ./generated/generated.tf ./output --state-dir ./generated/azurerm
+```
+
+**Step 4 — Validate:**
+```bash
+cd ./output
+terraform fmt .
+terraform init
+terraform plan   # should show: No changes.
+```
+
 ## Output Files
+
+### AWS output files
 
 | File | Contents |
 |---|---|
@@ -108,13 +145,24 @@ terraform plan   # should show: No changes.
 | `secrets.tf` | Secrets Manager and SSM Parameter Store resources |
 | `misc.tf` | Any resource type not in the grouping map (fallback) |
 
+### Azure output files
+
+| File | Contents |
+|---|---|
+| `provider.tf` | `provider "azurerm"` and `terraform {}` blocks (de-duplicated) |
+| `foundation.tf` | Resource groups, virtual networks, subnets, NSGs, route tables, public IPs |
+| `app.tf` | Virtual machines, network interfaces, scale sets, App Service plans and apps |
+| `messaging.tf` | Service Bus namespaces/queues/topics, Event Hubs, storage accounts and queues |
+| `data.tf` | SQL servers/databases, Cosmos DB, Redis, PostgreSQL, MySQL, Storage containers/blobs |
+| `misc.tf` | Any resource type not in the grouping map (fallback) |
+
 Only files with at least one resource are written.
 
 ## What Gets Removed
 
 ### Terraformer noise (always removed)
 - All `output` blocks — these are Terraformer cross-module ID exports, not real outputs
-- Duplicate `provider "aws"` blocks — one is kept, the rest dropped
+- Duplicate `provider` blocks — one is kept, the rest dropped
 - Duplicate `terraform { required_providers {} }` blocks — one is kept
 - All `data "terraform_remote_state"` blocks — replaced with direct resource references
 - `primary_network_interface` nested block on `aws_instance` — computed, hard-coded ENI ID
@@ -124,7 +172,12 @@ Only files with at least one resource are written.
 - `enable_classiclink` and `enable_classiclink_dns_support` on `aws_vpc` — removed in provider v5, Terraformer still emits them
 
 ### Default values (removed only when exactly matching registry)
-Cross-referenced against [`engine/defaults_registry.json`](engine/defaults_registry.json):
+Cross-referenced against [`engine/defaults_registry.json`](engine/defaults_registry.json).
+
+The special sentinel value `"__DROP__"` marks attributes that must always be removed regardless
+of their current value (e.g. deprecated attributes that Terraformer emits but providers reject).
+
+#### AWS defaults
 
 | Resource | Removed attributes (when matching default) |
 |---|---|
@@ -132,6 +185,19 @@ Cross-referenced against [`engine/defaults_registry.json`](engine/defaults_regis
 | `aws_vpc` | `assign_generated_ipv6_cidr_block`, `enable_dns_support`, `enable_dns_hostnames` (if false), `enable_network_address_usage_metrics`, `instance_tenancy`, `ipv6_netmask_length` |
 | `aws_instance` | `disable_api_stop/termination`, `ebs_optimized`, `get_password_data`, `hibernation`, `instance_initiated_shutdown_behavior`, `ipv6_address_count`, `monitoring`, `source_dest_check`, `tenancy`; `cpu_core_count`/`cpu_threads_per_core` (when `cpu_options` block present); nested: `capacity_reservation_specification`, `enclave_options`, `maintenance_options`, `metadata_options`, `private_dns_name_options`, `root_block_device` (partial) |
 | Any resource | `region` (when matches provider region — always a Terraformer artifact) |
+
+#### Azure defaults
+
+| Resource | Removed attributes (when matching default) |
+|---|---|
+| `azurerm_virtual_network` | `dns_servers`, `edge_zone`, `flow_timeout_in_minutes` |
+| `azurerm_subnet` | `private_endpoint_network_policies`, `private_link_service_network_policies_enabled`, `service_endpoint_policy_ids`, `service_endpoints` |
+| `azurerm_network_security_group` | `tags` (empty map) |
+| `azurerm_public_ip` | `allocation_method`, `idle_timeout_in_minutes`, `ip_version`, `sku`, `sku_tier`, `zones` |
+| `azurerm_network_interface` | `enable_accelerated_networking`, `enable_ip_forwarding` (always `__DROP__` — deprecated in favour of the `ip_configuration` block) |
+| `azurerm_linux_virtual_machine` | `allow_extension_operations`, `encryption_at_host_enabled`, `eviction_policy`, `extensions_time_budget`, `patch_assessment_mode`, `patch_mode`, `priority`, `provision_vm_agent`, `secure_boot_enabled`, `vtpm_enabled`, `zone` |
+| `azurerm_windows_virtual_machine` | `allow_extension_operations`, `encryption_at_host_enabled`, `enable_automatic_updates`, `eviction_policy`, `extensions_time_budget`, `hotpatching_enabled`, `patch_assessment_mode`, `patch_mode`, `priority`, `provision_vm_agent`, `secure_boot_enabled`, `vtpm_enabled`, `zone` |
+| `azurerm_storage_account` | `access_tier`, `allow_nested_items_to_be_public`, `cross_tenant_replication_enabled`, `default_to_oauth_authentication`, `edge_zone`, `infrastructure_encryption_enabled`, `is_hns_enabled`, `large_file_share_enabled`, `min_tls_version`, `nfsv3_enabled`, `public_network_access_enabled`, `sftp_enabled`, `shared_access_key_enabled`, `table_encryption_key_type` |
 
 ## What Is Preserved (by design)
 
@@ -153,16 +219,19 @@ engine/                      Python package — the refactoring pipeline
   noise_remover.py           Terraformer artifact removal + reference rewriter
   default_remover.py         Registry-driven attribute stripping
   registry.py                Loads defaults_registry.json, type-aware is_default()
-  grouper.py                 Static RESOURCE_GROUP_MAP + group assignment
+  grouper.py                 Static RESOURCE_GROUP_MAP + group assignment (AWS + Azure)
   emitter.py                 Renders groups to .tf files
-  state_merger.py            Merges Terraformer v3/v4 state files into a single v4 state
+  state_merger.py            Merges Terraformer v3/v4 state files; multi-provider aware
   defaults_registry.json     Curated defaults: resource_type → attribute → default_value
 
 examples/
   aws-basic/
-    main.tf                  Hand-written reference showing minimal clean config
-    generated.tf             (runtime) merged Terraformer input — produced by merge step
+    main.tf                  Hand-written reference — minimal clean AWS config
     generated/aws/           (runtime) raw Terraformer output — produced by Terraformer
+    output/                  (runtime) refactored output — produced by the engine
+  azure-basics/
+    main.tf                  Hand-written reference — minimal clean Azure config
+    generated/azurerm/       (runtime) raw Terraformer output — produced by Terraformer
     output/                  (runtime) refactored output — produced by the engine
 ```
 
@@ -175,22 +244,32 @@ Edit [`engine/defaults_registry.json`](engine/defaults_registry.json) to add cov
   "aws_s3_bucket": {
     "force_destroy": false,
     "object_lock_enabled": false
+  },
+  "azurerm_key_vault": {
+    "enable_rbac_authorization": false,
+    "enabled_for_deployment": false
   }
 }
 ```
 
-Values must be standard JSON types: `true`/`false` for booleans, numbers without quotes, strings with quotes. Cross-check every entry against the [Terraform AWS provider docs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs) before adding.
+Values must be standard JSON types: `true`/`false` for booleans, numbers without quotes, strings with quotes.
+Use `"__DROP__"` as the value to unconditionally remove an attribute regardless of its value (e.g. deprecated attributes that Terraformer still emits but the provider rejects).
+
+Cross-check every entry against the provider docs before adding:
+- [Terraform AWS provider docs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
+- [Terraform AzureRM provider docs](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
 
 ## Extending the Grouping Map
 
-Edit `RESOURCE_GROUP_MAP` in [`engine/grouper.py`](engine/grouper.py) to add new resource types. Any type not in the map falls into `misc.tf`.
+Edit `RESOURCE_GROUP_MAP` in [`engine/grouper.py`](engine/grouper.py) to add new resource types. Any type not in the map falls into `misc.tf`. The map covers both `aws_*` and `azurerm_*` prefixes.
 
 ## Known Limitations
 
 - Resource labels are not renamed (e.g. `tfer--subnet-07e44e47643c99518` is preserved)
 - No `variables.tf` generation
-- `cpu_options` and `credit_specification` are preserved (instance-type-dependent defaults)
-- `volume_type = "gp2"` is preserved (safe default ambiguity)
+- AWS: `cpu_options` and `credit_specification` are preserved (instance-type-dependent defaults)
+- AWS: `volume_type = "gp2"` is preserved (safe default ambiguity)
+- Azure: `features {}` block in `provider "azurerm"` is preserved as-is from Terraformer output
 
 ## Contributors
 

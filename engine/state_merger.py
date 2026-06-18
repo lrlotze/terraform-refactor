@@ -57,11 +57,14 @@ def _provider_string_for_type(resource_type: str) -> str:
     e.g.  "aws_vpc"                      → 'provider["registry.terraform.io/hashicorp/aws"]'
           "azurerm_linux_virtual_machine" → 'provider["registry.terraform.io/hashicorp/azurerm"]'
 
-    Falls back to the "aws" provider for unrecognised prefixes to preserve
-    prior behaviour rather than silently producing a broken state file.
+    For unrecognised prefixes, attempts the conventional hashicorp/<prefix> path
+    and prints a warning rather than silently falling back to the AWS provider.
     """
     prefix = resource_type.split("_")[0]
-    registry_path = _PROVIDER_REGISTRY.get(prefix, _PROVIDER_REGISTRY["aws"])
+    registry_path = _PROVIDER_REGISTRY.get(prefix)
+    if registry_path is None:
+        registry_path = f"registry.terraform.io/hashicorp/{prefix}"
+        print(f"  [WARN] Unknown provider prefix '{prefix}' for resource type '{resource_type}' — assuming {registry_path}")
     return f'provider["{registry_path}"]'
 
 
@@ -127,7 +130,7 @@ def _extract_v3_resources(state: dict) -> list[dict]:
                         "schema_version": schema_version,
                         "attributes": attributes,
                         "sensitive_attributes": [],
-                        "private": None,
+                        "private": "",
                     }
                 ],
             }
