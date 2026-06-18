@@ -15,17 +15,26 @@ from parser import render_block
 
 # Group names that get a descriptive header comment
 _GROUP_DESCRIPTIONS: dict[str, str] = {
+    # Shared / generic
     "provider":   "Terraform provider configuration and version constraints",
-    "networking": "VPC, subnets, internet gateways, and other network resources",
-    "compute":    "EC2 instances, launch templates, and autoscaling resources",
-    "storage":    "S3 buckets, EBS volumes, and other storage resources",
-    "database":   "RDS instances, ElastiCache clusters, and database resources",
-    "iam":        "IAM roles, policies, and identity resources",
-    "dns":        "Route53 zones and DNS records",
-    "lb":         "Load balancers, target groups, and listeners",
-    "monitoring": "CloudWatch alarms, log groups, and SNS topics",
-    "secrets":    "Secrets Manager and SSM Parameter Store resources",
     "misc":       "Uncategorised resources",
+
+    # AWS
+    "networking": "VPC, subnets, internet gateways, and other network resources",
+    "compute":    "EC2 / virtual machine instances and related compute resources",
+    "storage":    "S3 buckets, EBS volumes, and other storage resources",
+    "database":   "RDS, ElastiCache, Cosmos DB, and other database resources",
+    "iam":        "IAM roles, policies, and identity resources",
+    "dns":        "Route53 zones, DNS records, and private DNS resources",
+    "lb":         "Load balancers, target groups, and listeners",
+    "monitoring": "CloudWatch, Azure Monitor alarms, log groups, and alerting resources",
+    "secrets":    "Key Vault, Secrets Manager, and SSM Parameter Store resources",
+
+    # Azure-specific
+    "foundation": "Resource groups and subscription-level management resources",
+    "app":        "App Service, Function Apps, AKS, and container resources",
+    "messaging":  "Event Hub, Service Bus, and messaging resources",
+    "data":       "Data Factory, Databricks, Synapse, and analytics resources",
 }
 
 

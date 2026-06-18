@@ -14,7 +14,17 @@
     "aws_instance.cpu_options": "NOT in registry — core_count and threads_per_core are instance-type-dependent; preserving per user instruction.",
     "aws_instance.credit_specification": "NOT in registry — cpu_credits (unlimited vs standard) is instance-type-dependent; preserving per user instruction.",
     "region_rule": "The region attribute on any resource (aws_subnet, aws_vpc, aws_internet_gateway, aws_instance) is a Terraformer artifact. It is handled by a universal rule in default_remover.py, not registry lookup, because it is not a real configurable attribute — it merely echoes the provider region.",
-    "primary_network_interface": "Dropped by noise_remover.py as a computed block containing a hard-coded ENI ID."
+    "primary_network_interface": "Dropped by noise_remover.py as a computed block containing a hard-coded ENI ID.",
+    "azurerm_resource_group": "https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group — no optional attributes carry provider-side defaults that Terraformer would emit; name and location are required.",
+    "azurerm_virtual_network": "https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/virtual_network — bgp_community, dns_servers, edge_zone are optional with no default; ddos_protection_plan.enable defaults to false when the block is present. encryption.enforcement has no default value. flow_timeout_in_minutes = 0 is a Terraformer sentinel meaning 'not configured' — valid range is 4–30, so 0 must be stripped as noise.",
+    "azurerm_subnet": "https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet — private_endpoint_network_policies defaults to Disabled, private_link_service_network_policies_enabled defaults to true, default_outbound_access_enabled defaults to true, service_endpoint_policy_ids and service_endpoints default to empty. enforce_private_link_endpoint_network_policies, enforce_private_link_service_network_policies, and private_endpoint_network_policies_enabled are all deprecated aliases (removed in v4.0) that Terraformer emits — they must be stripped to avoid deprecation warnings and conflict errors.",
+    "azurerm_public_ip": "https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/public_ip — ddos_protection_mode defaults to VirtualNetworkInherited, idle_timeout_in_minutes defaults to 4, ip_version defaults to IPv4, sku defaults to Basic (for Dynamic allocation) or Standard, sku_tier defaults to Regional, zones defaults to empty.",
+    "azurerm_network_interface": "https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/network_interface — accelerated_networking_enabled defaults to false, ip_forwarding_enabled defaults to false, dns_servers defaults to empty, edge_zone and internal_dns_name_label are optional. enable_accelerated_networking and enable_ip_forwarding are deprecated aliases (removed in v4.0) that Terraformer emits — they must be stripped.",
+    "azurerm_network_interface.ip_configuration": "primary is computed (true for first config), private_ip_address is computed when Dynamic allocation is used — not a safe default to remove.",
+    "azurerm_linux_virtual_machine.flat": "https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/linux_virtual_machine — allow_extension_operations defaults to true, bypass_platform_safety_checks_on_user_schedule_enabled defaults to false, computer_name defaults to name value, disable_password_authentication defaults to true when no admin_password set (false when password is set), encryption_at_host_enabled defaults to false, extensions_time_budget defaults to PT1H30M, patch_assessment_mode defaults to ImageDefault, patch_mode defaults to ImageDefault, priority defaults to Regular, provision_vm_agent defaults to true, secure_boot_enabled defaults to false, vtpm_enabled defaults to false. platform_fault_domain = -1 is a Terraformer sentinel meaning 'not in a scale set'. max_bid_price = -1 is a Terraformer sentinel meaning 'not a Spot VM'. disk_controller_type and vm_agent_platform_updates_enabled are computed/Terraformer-only attributes — all four must be stripped as noise.",
+    "azurerm_linux_virtual_machine.os_disk": "https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/linux_virtual_machine#os_disk — caching is required (no default), storage_account_type is required (no default). write_accelerator_enabled defaults to false, disk_size_gb is computed when omitted, secure_vm_disk_encryption_set_id and security_encryption_type are optional.",
+    "azurerm_linux_virtual_machine.boot_diagnostics": "storage_account_uri defaults to null (managed storage) when block is present without a URI — https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/linux_virtual_machine#boot_diagnostics",
+    "azurerm_linux_virtual_machine.termination_notification": "enabled is required when block is present; timeout defaults to PT5M — https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/linux_virtual_machine#termination_notification"
   },
 
   "aws_subnet": {
@@ -63,5 +73,53 @@
     "private_dns_name_options.hostname_type": "ip-name",
     "root_block_device.delete_on_termination": true,
     "root_block_device.encrypted": false
+  },
+
+  "azurerm_resource_group": {},
+
+  "azurerm_virtual_network": {
+    "ddos_protection_plan.enable": false,
+    "flow_timeout_in_minutes": 0
+  },
+
+  "azurerm_subnet": {
+    "private_endpoint_network_policies": "Disabled",
+    "private_link_service_network_policies_enabled": true,
+    "default_outbound_access_enabled": true,
+    "enforce_private_link_endpoint_network_policies": "__DROP__",
+    "enforce_private_link_service_network_policies": "__DROP__",
+    "private_endpoint_network_policies_enabled": "__DROP__"
+  },
+
+  "azurerm_public_ip": {
+    "ddos_protection_mode": "VirtualNetworkInherited",
+    "idle_timeout_in_minutes": 4,
+    "ip_version": "IPv4",
+    "sku_tier": "Regional"
+  },
+
+  "azurerm_network_interface": {
+    "accelerated_networking_enabled": false,
+    "ip_forwarding_enabled": false,
+    "enable_accelerated_networking": "__DROP__",
+    "enable_ip_forwarding": "__DROP__"
+  },
+
+  "azurerm_linux_virtual_machine": {
+    "allow_extension_operations": true,
+    "bypass_platform_safety_checks_on_user_schedule_enabled": false,
+    "encryption_at_host_enabled": false,
+    "extensions_time_budget": "PT1H30M",
+    "patch_assessment_mode": "ImageDefault",
+    "patch_mode": "ImageDefault",
+    "priority": "Regular",
+    "provision_vm_agent": true,
+    "secure_boot_enabled": false,
+    "vtpm_enabled": false,
+    "platform_fault_domain": -1,
+    "max_bid_price": -1,
+    "disk_controller_type": "__DROP__",
+    "vm_agent_platform_updates_enabled": "__DROP__",
+    "os_disk.write_accelerator_enabled": false
   }
 }

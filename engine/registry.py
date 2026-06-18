@@ -26,9 +26,15 @@ def load_registry() -> dict:
     return _REGISTRY
 
 
+#: Sentinel string used in defaults_registry.json to flag deprecated/conflicting
+#: attributes that must always be dropped regardless of their value.
+DROP_SENTINEL = "__DROP__"
+
+
 def is_default(resource_type: str, attr_path: str, typed_value: Any) -> bool:
     """
-    Return True iff the attribute value exactly matches the registered default.
+    Return True iff the attribute value exactly matches the registered default,
+    OR if the registry marks this attribute with the DROP_SENTINEL.
 
     Args:
         resource_type: e.g. "aws_vpc"
@@ -37,7 +43,7 @@ def is_default(resource_type: str, attr_path: str, typed_value: Any) -> bool:
         typed_value:   the Python-typed value from the parser (bool, int, str, etc.)
 
     Returns:
-        True  → safe to remove (value matches registered default)
+        True  → safe to remove (value matches registered default, or DROP sentinel)
         False → preserve (unknown default, or value differs from default)
 
     Safety: any exception returns False (preserve).
@@ -52,6 +58,11 @@ def is_default(resource_type: str, attr_path: str, typed_value: Any) -> bool:
             return False
 
         default_val = resource_defaults[attr_path]
+
+        # DROP sentinel: always remove this attribute regardless of its actual value.
+        # Used for deprecated aliases and Terraformer-only computed attributes.
+        if default_val == DROP_SENTINEL:
+            return True
 
         # Strict type + value equality — no cross-type coercion here.
         # The parser coerces typed_value to Python types; registry stores JSON-native types.

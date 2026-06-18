@@ -30,17 +30,27 @@ from parser import (
 # Reference rewriter
 # ---------------------------------------------------------------------------
 
-# Matches: "${data.terraform_remote_state.<alias>.outputs.<rtype>_<rname>_id}"
-# Also matches without ${ } wrapper when used bare (rare but possible)
+# Matches: "${data.terraform_remote_state.<alias>.outputs.<rtype>_tfer--<rname>_<attr>}"
+# Supports both aws_* and azurerm_* resource type prefixes.
+# Also matches without ${ } wrapper when used bare (rare but possible).
+#
+# Parsing strategy: "_tfer--" is the only unambiguous boundary in the output key.
+# We split on that literal to isolate the resource type (everything before "_tfer--")
+# from the resource name (starting with "tfer--") and trailing attribute.
+#
+# Group 1: resource type  e.g. "aws_vpc" or "azurerm_linux_virtual_machine"
+# Group 2: resource name  e.g. "tfer--vm-web" (includes the tfer-- prefix)
+# Group 3: attribute      e.g. "id", "name", "location"
 _REMOTE_STATE_REF_RE = re.compile(
     r'\$\{data\.terraform_remote_state\.\w+\.outputs\.'
-    r'(aws_[a-z_]+)_(tfer--[\w-]+)_id\}'
+    r'((?:aws|azurerm)_[a-z_]+)_tfer--([\w-]+)_([a-z_]+)\}'
 )
 
-# Also handle bare (non-interpolated) references just in case
+# Bare (non-interpolated) form.
+# Lookbehind/lookahead guards prevent matching inside longer quoted strings.
 _REMOTE_STATE_BARE_RE = re.compile(
-    r'data\.terraform_remote_state\.\w+\.outputs\.'
-    r'(aws_[a-z_]+)_(tfer--[\w-]+)_id'
+    r'(?<!["\w])data\.terraform_remote_state\.\w+\.outputs\.'
+    r'((?:aws|azurerm)_[a-z_]+)_tfer--([\w-]+)_([a-z_]+)(?!["\w])'
 )
 
 
@@ -61,29 +71,34 @@ def _rewrite_ref(value: str, known: set[str]) -> str:
     e.g.  "${data.terraform_remote_state.vpc.outputs.aws_vpc_tfer--vpc-abc_id}"
           → "aws_vpc.tfer--vpc-abc.id"
 
+    e.g.  "data.terraform_remote_state.resource_group.outputs.azurerm_resource_group_tfer--rg-main_location"
+          → "azurerm_resource_group.tfer--rg-main.location"
+
     If the rewritten reference does not correspond to a known resource, the
     original value is preserved and a warning is printed.
     """
     def replacer(m: re.Match) -> str:
-        rtype = m.group(1)     # e.g. aws_vpc
-        rname = m.group(2)     # e.g. tfer--vpc-0b530d7af19ffa635
+        rtype = m.group(1)          # e.g. aws_vpc or azurerm_linux_virtual_machine
+        rname = "tfer--" + m.group(2)  # restore the tfer-- prefix stripped by the regex split
+        attr  = m.group(3)          # e.g. id, name, location
         candidate = f"{rtype}.{rname}"
         if candidate not in known:
             print(f"  [WARN] Reference rewrite: '{candidate}' not found in parsed resources — preserving original ref")
             return m.group(0)
-        return f"{rtype}.{rname}.id"
+        return f"{rtype}.{rname}.{attr}"
 
     rewritten = _REMOTE_STATE_REF_RE.sub(replacer, value)
 
     # Also handle bare (non-${ }) form
     def bare_replacer(m: re.Match) -> str:
         rtype = m.group(1)
-        rname = m.group(2)
+        rname = "tfer--" + m.group(2)
+        attr  = m.group(3)
         candidate = f"{rtype}.{rname}"
         if candidate not in known:
             print(f"  [WARN] Reference rewrite (bare): '{candidate}' not found — preserving original ref")
             return m.group(0)
-        return f"{rtype}.{rname}.id"
+        return f"{rtype}.{rname}.{attr}"
 
     rewritten = _REMOTE_STATE_BARE_RE.sub(bare_replacer, rewritten)
     return rewritten
