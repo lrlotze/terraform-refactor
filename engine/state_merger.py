@@ -28,7 +28,6 @@ import json
 import os
 import glob
 import uuid
-from typing import Any
 
 
 def _find_state_files(state_dir: str) -> list[str]:

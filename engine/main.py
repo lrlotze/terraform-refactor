@@ -148,7 +148,7 @@ def main() -> None:
         args = args[:idx] + args[idx + 2:]  # remove both --state-dir and its value
 
     if len(args) != 2:
-        print("Usage: python backend/main.py <input.tf> <output_dir> [--dry-run] [--state-dir <dir>]")
+        print("Usage: python3 engine/main.py <input.tf> <output_dir> [--dry-run] [--state-dir <dir>]")
         sys.exit(1)
 
     input_path, output_dir = args[0], args[1]

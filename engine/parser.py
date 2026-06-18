@@ -449,8 +449,7 @@ def parse_hcl(text: str) -> HCLFile:
 
 # Pattern that matches a bare Terraform resource/data reference expression:
 # e.g. aws_vpc.some_name.id  or  aws_vpc.some_name.attribute
-import re as _re
-_RESOURCE_REF_RE = _re.compile(r'^[a-z][a-z0-9_]*\.[a-zA-Z0-9_\-]+\.[a-z][a-z0-9_]*$')
+_RESOURCE_REF_RE = re.compile(r'^[a-z][a-z0-9_]*\.[a-zA-Z0-9_\-]+\.[a-z][a-z0-9_]*$')
 
 
 def _render_value(attr: Attribute) -> str:
@@ -470,7 +469,7 @@ def _render_value(attr: Attribute) -> str:
     # Lists — preserve raw, but unquote any resource reference expressions inside
     if isinstance(v, str) and raw.startswith("["):
         # Replace "aws_type.name.attr" (quoted reference) with bare expression
-        return _re.sub(r'"([a-z][a-z0-9_]*\.[a-zA-Z0-9_\-]+\.[a-z_]+)"', r'\1', raw)
+        return re.sub(r'"([a-z][a-z0-9_]*\.[a-zA-Z0-9_\-]+\.[a-z_]+)"', r'\1', raw)
 
     # Inline maps — preserve raw
     if isinstance(v, str) and raw.startswith("{"):

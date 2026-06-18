@@ -2,7 +2,7 @@
 Defaults Registry
 
 Loads defaults_registry.json and exposes is_default() for attribute comparison.
-Type-aware: registry stores Python-native types; comparison is exact-match only.
+Type-aware: registry stores standard JSON types; comparison is exact-match only.
 """
 
 from __future__ import annotations

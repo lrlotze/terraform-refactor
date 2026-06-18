@@ -158,11 +158,6 @@ engine/                      Python package — the refactoring pipeline
   state_merger.py            Merges Terraformer v3/v4 state files into a single v4 state
   defaults_registry.json     Curated defaults: resource_type → attribute → default_value
 
-tests/
-  test_pipeline.py           71 correctness assertions against the aws-basic example
-                             (requires examples/aws-basic/generated.tf and
-                             examples/aws-basic/output/ — see Testing)
-
 examples/
   aws-basic/
     main.tf                  Hand-written reference showing minimal clean config
@@ -189,24 +184,6 @@ Values must be standard JSON types: `true`/`false` for booleans, numbers without
 ## Extending the Grouping Map
 
 Edit `RESOURCE_GROUP_MAP` in [`engine/grouper.py`](engine/grouper.py) to add new resource types. Any type not in the map falls into `misc.tf`.
-
-## Testing
-
-The test suite runs against the `examples/aws-basic/` fixture. The required input files (`examples/aws-basic/generated.tf` and `examples/aws-basic/generated/aws/`) are runtime artifacts — produce them by running Terraformer with `--path-output=./examples/aws-basic/generated`, then run the merge and engine steps (see [Usage](#usage)) targeting `examples/aws-basic/` paths:
-
-```bash
-# 1. Merge Terraformer output into examples/aws-basic/generated.tf
-find ./examples/aws-basic/generated/aws -name "*.tf" \
-  -not -name "variables.tf" -not -name "outputs.tf" -not -name "provider.tf" \
-  | sort | xargs cat > examples/aws-basic/generated.tf
-
-# 2. Run the engine
-python3 engine/main.py examples/aws-basic/generated.tf examples/aws-basic/output \
-  --state-dir examples/aws-basic/generated/aws
-
-# 3. Run the correctness test suite (71 assertions)
-python3 tests/test_pipeline.py
-```
 
 ## Known Limitations
 
