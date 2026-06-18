@@ -25,6 +25,7 @@ generated.tf
   → [3] Strip defaults remove attributes whose values exactly match provider defaults
   → [4] Group          assign each resource to a logical file (networking, compute, ...)
   → [5] Emit           write one clean .tf file per group
+  → [6] State          (optional) merge per-module .tfstate files into a single terraform.tfstate
 ```
 
 **Key principle: `SAFETY > CORRECTNESS > CLEANLINESS`**  
@@ -49,8 +50,8 @@ python3 engine/main.py examples/aws-basic/generated.tf examples/aws-basic/output
 After running, validate and format:
 ```bash
 cd examples/aws-basic/output
-terraform init
 terraform fmt .
+terraform init
 terraform plan   # should show: No changes.
 ```
 
@@ -161,7 +162,6 @@ python3 tests/test_pipeline.py
 - No `variables.tf` generation
 - `cpu_options` and `credit_specification` are preserved (instance-type-dependent defaults)
 - `volume_type = "gp2"` is preserved (safe default ambiguity)
-- No `variables.tf` extraction
 
 ## Contributors
 
