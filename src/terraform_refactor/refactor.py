@@ -8,6 +8,20 @@ from typing import Any
 from .llm import analyze_terraform
 from .parser import load_tf_files
 
+_DEFAULT_RESOURCE_DEFAULTS = {
+    "aws_subnet": {
+        "map_public_ip_on_launch": "false",
+    },
+    "aws_instance": {
+        "associate_public_ip_address": "false",
+        "disable_api_termination": "false",
+        "ebs_optimized": "false",
+    },
+    "aws_internet_gateway": {
+        "tags": "{}",
+    },
+}
+
 
 def run_refactor(source: Path, output: Path, dry_run: bool = False) -> None:
     files = load_tf_files(source)
@@ -23,6 +37,7 @@ def run_refactor(source: Path, output: Path, dry_run: bool = False) -> None:
         summary.append(f"  resources: {resource_count}")
 
         cleaned_text = _clean_raw_text(raw_text)
+        cleaned_text = _apply_aws_default_cleanup(cleaned_text)
         analysis_input = _build_analysis_payload(tf_path.name, cleaned_text, resource_count)
         analysis_text = analyze_terraform(analysis_input)
 
@@ -52,6 +67,57 @@ def _clean_raw_text(raw_text: str) -> str:
     if not cleaned.endswith("\n"):
         cleaned += "\n"
     return cleaned
+
+
+def _apply_aws_default_cleanup(raw_text: str) -> str:
+    blocks = _extract_resource_blocks(raw_text)
+    cleaned_text = raw_text
+    for resource_type, resource_name, block_text in blocks:
+        cleaned_block = _cleanup_resource_block(resource_type, block_text)
+        if cleaned_block != block_text:
+            cleaned_text = cleaned_text.replace(block_text, cleaned_block)
+    return cleaned_text
+
+
+def _extract_resource_blocks(raw_text: str) -> list[tuple[str, str, str]]:
+    blocks: list[tuple[str, str, str]] = []
+    lines = raw_text.splitlines()
+    i = 0
+    while i < len(lines):
+        match = re.match(r'^resource\s+"([^"]+)"\s+"([^"]+)"\s*{', lines[i].strip())
+        if match:
+            resource_type, name = match.group(1), match.group(2)
+            block_lines = [lines[i]]
+            depth = lines[i].count('{') - lines[i].count('}')
+            i += 1
+            while i < len(lines) and depth > 0:
+                line = lines[i]
+                depth += line.count('{') - line.count('}')
+                block_lines.append(line)
+                i += 1
+            blocks.append((resource_type, name, '\n'.join(block_lines) + '\n'))
+        else:
+            i += 1
+    return blocks
+
+
+def _cleanup_resource_block(resource_type: str, block_text: str) -> str:
+    defaults = _DEFAULT_RESOURCE_DEFAULTS.get(resource_type, {})
+    if not defaults:
+        return block_text
+
+    cleaned_lines: list[str] = []
+    for line in block_text.splitlines():
+        stripped = line.strip()
+        removed = False
+        for key, default_value in defaults.items():
+            if re.match(rf'^{re.escape(key)}\s*=\s*{re.escape(default_value)}$', stripped):
+                removed = True
+                break
+        if not removed:
+            cleaned_lines.append(line)
+    cleaned_block = '\n'.join(cleaned_lines).rstrip() + '\n'
+    return cleaned_block
 
 
 def _build_analysis_payload(filename: str, cleaned_text: str, resource_count: int) -> str:
