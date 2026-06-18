@@ -1,0 +1,12 @@
+# Terraform files
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Terraform lock file (optional keep/remove)
+.terraform.lock.hcl
+
+# Generated files (optional)
+generated/
+generated.tf
