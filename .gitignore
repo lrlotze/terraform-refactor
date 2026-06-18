@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform.lock.hcl
+crash.log
+
+# Tool output (regenerate with engine/main.py)
+examples/*/output/

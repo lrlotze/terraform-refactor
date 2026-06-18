@@ -1,0 +1,67 @@
+{
+  "_version": "1.0",
+  "_source_notes": {
+    "aws_subnet": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/subnet — all boolean attributes default to false, enable_lni_at_device_index defaults to 0, private_dns_hostname_type_on_launch defaults to ip-name",
+    "aws_vpc": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc — enable_dns_support defaults to true, enable_dns_hostnames defaults to false, instance_tenancy defaults to default, assign_generated_ipv6_cidr_block defaults to false, enable_network_address_usage_metrics defaults to false, ipv6_netmask_length is 0 when no IPv6 CIDR assigned",
+    "aws_internet_gateway": "region is a Terraformer artifact that echoes the provider region; it is not a configurable attribute in the resource schema",
+    "aws_instance.flat": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance — disable_api_stop/termination default false, ebs_optimized default false, get_password_data default false, hibernation default false, instance_initiated_shutdown_behavior default stop, ipv6_address_count default 0, monitoring default false, source_dest_check default true, tenancy default default. associate_public_ip_address and availability_zone are NOT defaults — they depend on subnet config and AZ placement respectively, so they are preserved. private_ip is always preserved (hard-coded IP). placement_partition_number is computed/read-only.",
+    "aws_instance.capacity_reservation_specification": "capacity_reservation_preference defaults to open — https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance#capacity_reservation_preference",
+    "aws_instance.enclave_options": "enabled defaults to false — https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance#enclave_options",
+    "aws_instance.maintenance_options": "auto_recovery defaults to default — https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance#maintenance_options",
+    "aws_instance.metadata_options": "http_endpoint defaults to enabled, http_protocol_ipv6 defaults to disabled, http_put_response_hop_limit defaults to 1, http_tokens defaults to optional (IMDSv1), instance_metadata_tags defaults to disabled — https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance#metadata_options",
+    "aws_instance.private_dns_name_options": "enable_resource_name_dns_a_record defaults to false, enable_resource_name_dns_aaaa_record defaults to false, hostname_type defaults to ip-name — https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance#private_dns_name_options",
+    "aws_instance.root_block_device": "delete_on_termination defaults to true, encrypted defaults to false. volume_size (8 GB) and volume_type are NOT in registry because they are configuration choices, not safe defaults to remove. Removing them would allow Terraform to revert to provider defaults on re-apply.",
+    "aws_instance.cpu_options": "NOT in registry — core_count and threads_per_core are instance-type-dependent; preserving per user instruction.",
+    "aws_instance.credit_specification": "NOT in registry — cpu_credits (unlimited vs standard) is instance-type-dependent; preserving per user instruction.",
+    "region_rule": "The region attribute on any resource (aws_subnet, aws_vpc, aws_internet_gateway, aws_instance) is a Terraformer artifact. It is handled by a universal rule in default_remover.py, not registry lookup, because it is not a real configurable attribute — it merely echoes the provider region.",
+    "primary_network_interface": "Dropped by noise_remover.py as a computed block containing a hard-coded ENI ID."
+  },
+
+  "aws_subnet": {
+    "assign_ipv6_address_on_creation": false,
+    "enable_dns64": false,
+    "enable_lni_at_device_index": 0,
+    "enable_resource_name_dns_a_record_on_launch": false,
+    "enable_resource_name_dns_aaaa_record_on_launch": false,
+    "ipv6_native": false,
+    "map_customer_owned_ip_on_launch": false,
+    "private_dns_hostname_type_on_launch": "ip-name"
+  },
+
+  "aws_vpc": {
+    "assign_generated_ipv6_cidr_block": false,
+    "enable_dns_hostnames": false,
+    "enable_dns_support": true,
+    "enable_network_address_usage_metrics": false,
+    "instance_tenancy": "default",
+    "ipv6_netmask_length": 0
+  },
+
+  "aws_internet_gateway": {},
+
+  "aws_instance": {
+    "disable_api_stop": false,
+    "disable_api_termination": false,
+    "ebs_optimized": false,
+    "get_password_data": false,
+    "hibernation": false,
+    "instance_initiated_shutdown_behavior": "stop",
+    "ipv6_address_count": 0,
+    "monitoring": false,
+    "source_dest_check": true,
+    "tenancy": "default",
+    "capacity_reservation_specification.capacity_reservation_preference": "open",
+    "enclave_options.enabled": false,
+    "maintenance_options.auto_recovery": "default",
+    "metadata_options.http_endpoint": "enabled",
+    "metadata_options.http_protocol_ipv6": "disabled",
+    "metadata_options.http_put_response_hop_limit": 1,
+    "metadata_options.http_tokens": "optional",
+    "metadata_options.instance_metadata_tags": "disabled",
+    "private_dns_name_options.enable_resource_name_dns_a_record": false,
+    "private_dns_name_options.enable_resource_name_dns_aaaa_record": false,
+    "private_dns_name_options.hostname_type": "ip-name",
+    "root_block_device.delete_on_termination": true,
+    "root_block_device.encrypted": false
+  }
+}
