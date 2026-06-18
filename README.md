@@ -2,6 +2,27 @@
 
 A deterministic Terraform refactoring engine that transforms noisy, Terraformer-generated `.tf` files into clean, modular, production-ready Terraform configuration — **without changing infrastructure behavior**.
 
+## Install (Bob AI skills)
+
+Install once, then use from any workspace by telling Bob *"convert my AWS infrastructure to Terraform"* or *"refactor my generated.tf"*.
+
+```bash
+git clone https://github.com/lucaslotze/terraform-refactor ~/tools/terraform-refactor
+cd ~/tools/terraform-refactor
+./install.sh
+```
+
+This installs two Bob skills globally (`~/.bob/skills/`):
+
+| Skill | Trigger phrase | What it does |
+|---|---|---|
+| `aws-to-iac` | *"convert my AWS to Terraform"* | Runs Terraformer against live AWS, then refactors the output to clean IaC |
+| `tf-refactor` | *"refactor my generated.tf"* | Refactors existing Terraformer output you already have |
+
+The engine is symlinked from the cloned repo — run `git pull` at any time to pick up updates. No reinstall needed.
+
+**Prerequisites:** `python3`, `terraform`, `terraformer`, AWS credentials configured.
+
 ## Use Case
 
 Importing external infrastructure into Terraform (e.g. via [Terraformer](https://github.com/GoogleCloudPlatform/terraformer)) produces bloated files filled with:
