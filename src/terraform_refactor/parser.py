@@ -1,21 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
-
-import hcl2
 
 
-def load_tf_files(source: Path) -> dict[Path, dict[str, Any]]:
+def load_tf_files(source: Path) -> dict[Path, str]:
     if source.is_file():
-        return {source: _parse_tf_file(source)}
+        return {source: load_tf_text(source)}
 
     if source.is_dir():
-        return {path: _parse_tf_file(path) for path in sorted(source.rglob("*.tf"))}
+        return {path: load_tf_text(path) for path in sorted(source.rglob("*.tf"))}
 
     raise ValueError(f"Source path does not exist: {source}")
 
 
-def _parse_tf_file(path: Path) -> dict[str, Any]:
-    with path.open("r", encoding="utf-8") as handle:
-        return hcl2.load(handle)
+def load_tf_text(path: Path) -> str:
+    return path.read_text(encoding="utf-8")

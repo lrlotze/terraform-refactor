@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -16,19 +17,18 @@ def run_refactor(source: Path, output: Path, dry_run: bool = False) -> None:
     output.mkdir(parents=True, exist_ok=True)
     summary: list[str] = [f"Analyzing {len(files)} Terraform file(s) from {source}"]
 
-    for tf_path, content in files.items():
+    for tf_path, raw_text in files.items():
         summary.append(f"Found Terraform file: {tf_path.name}")
-        resource_count = len(_extract_resources(content))
+        resource_count = _count_resource_blocks(raw_text)
         summary.append(f"  resources: {resource_count}")
 
-        cleaned_content = _clean_parsed_content(content)
-        hcl_text = _format_hcl(cleaned_content)
-        analysis_input = _build_analysis_payload(tf_path.name, content, cleaned_content)
+        cleaned_text = _clean_raw_text(raw_text)
+        analysis_input = _build_analysis_payload(tf_path.name, cleaned_text, resource_count)
         analysis_text = analyze_terraform(analysis_input)
 
         if not dry_run:
             destination = output / tf_path.name
-            destination.write_text(hcl_text, encoding="utf-8")
+            destination.write_text(cleaned_text, encoding="utf-8")
             summary.append(f"  wrote cleaned Terraform: {destination}")
 
             report_file = output / f"{tf_path.stem}_analysis.tf"
@@ -40,85 +40,47 @@ def run_refactor(source: Path, output: Path, dry_run: bool = False) -> None:
         print(line)
 
 
-def _extract_resources(parsed: dict[str, Any]) -> list[dict[str, Any]]:
-    return parsed.get("resource", []) or []
+def _count_resource_blocks(raw_text: str) -> int:
+    return len(re.findall(r'^resource\s+"[^"]+"\s+"[^"]+"', raw_text, flags=re.MULTILINE))
 
 
-def _clean_parsed_content(parsed: dict[str, Any]) -> dict[str, Any]:
-    cleaned: dict[str, Any] = {}
-
-    for block_type, block_list in parsed.items():
-        if not isinstance(block_list, list):
-            cleaned[block_type] = block_list
-            continue
-
-        cleaned_blocks: list[dict[str, Any]] = []
-        for block in block_list:
-            cleaned_block = {}
-            for name, body in block.items():
-                if isinstance(body, dict):
-                    cleaned_block[name] = _normalize_resource_body(body)
-                else:
-                    cleaned_block[name] = body
-            cleaned_blocks.append(cleaned_block)
-        cleaned[block_type] = cleaned_blocks
-
+def _clean_raw_text(raw_text: str) -> str:
+    cleaned = raw_text.replace('\r\n', '\n').strip()
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    cleaned = re.sub(r"[ \t]+\n", "\n", cleaned)
+    cleaned = re.sub(r"^([ \t]+)#", r"#", cleaned, flags=re.MULTILINE)
+    if not cleaned.endswith("\n"):
+        cleaned += "\n"
     return cleaned
 
 
-def _normalize_resource_body(body: dict[str, Any]) -> dict[str, Any]:
-    normalized: dict[str, Any] = {}
-    for key, value in sorted(body.items()):
-        if key in {"id", "arn", "owner_id"}:
-            continue
-        normalized[key] = value
-    return normalized
-
-
-def _build_analysis_payload(filename: str, original: dict[str, Any], cleaned: dict[str, Any]) -> str:
+def _build_analysis_payload(filename: str, cleaned_text: str, resource_count: int) -> str:
     payload = {
         "filename": filename,
         "provider": "aws",
-        "original_blocks": original,
-        "cleaned_blocks": cleaned,
+        "resource_count": resource_count,
+        "cleaned_hcl": cleaned_text,
         "instructions": (
-            "Analyze the Terraform file and provide a concise set of AWS-specific refactoring recommendations. "
-            "Identify where default values can be removed, where identical resources or variables can be grouped, "
-            "and whether any module structure improvements are appropriate. "
-            "Produce the answer in Terraform comment style using # comments."
+            "You are an AWS Terraform refactoring assistant. Analyze the supplied Terraform content and provide a concise set "
+            "of refactoring recommendations. Identify where default values can be removed, where identical resources or variables "
+            "can be grouped, and whether any module structure improvements are appropriate. Return the answer in Terraform comment style "
+            "using # comments and keep it actionable."
         ),
     }
     return json.dumps(payload, indent=2)
 
 
 def _format_analysis_report(analysis: str) -> str:
-    lines = ["# Terraform LLM analysis report", "#"""]
+    lines = ["# Terraform LLM analysis report", "#"]
     if analysis.strip():
         for line in analysis.splitlines():
-            if line.strip():
-                if line.startswith("#"):
-                    lines.append(line)
-                else:
-                    lines.append(f"# {line}")
+            stripped = line.rstrip()
+            if not stripped:
+                continue
+            if stripped.startswith("#"):
+                lines.append(stripped)
+            else:
+                lines.append(f"# {stripped}")
     else:
         lines.append("# No analysis available.")
-    return "\n".join(lines)
-
-
-def _format_hcl(parsed: dict[str, Any]) -> str:
-    lines: list[str] = []
-    for block_type, block_list in parsed.items():
-        if not isinstance(block_list, list):
-            continue
-
-        for block in block_list:
-            for name, body in block.items():
-                lines.append(f"{block_type} {name} {{")
-                if isinstance(body, dict):
-                    for key, value in body.items():
-                        lines.append(f"  {key} = {json.dumps(value)}")
-                else:
-                    lines.append(f"  {body}")
-                lines.append("}")
-                lines.append("")
-    return "\n".join(lines).strip()
+    return "\n".join(lines) + "\n"
