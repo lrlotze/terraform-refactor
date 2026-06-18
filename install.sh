@@ -235,7 +235,17 @@ Terraformer is not installed. Install it with:
 Then re-run this skill.
 ```
 
-### 1b. AWS credentials
+### 1b. Fetch the supported resource list from the installed binary
+
+**Always** run this before presenting resource options to the user — do not rely on a hardcoded list:
+
+```bash
+terraformer import aws list 2>&1
+```
+
+Store the output as the authoritative set of valid resource names for this run.
+
+### 1c. AWS credentials
 
 ```bash
 aws sts get-caller-identity 2>&1
@@ -247,7 +257,7 @@ aws sts get-caller-identity 2>&1
   - What region should be targeted?
   - Set `AWS_PROFILE` and `AWS_DEFAULT_REGION` accordingly before proceeding.
 
-### 1c. Terraform CLI (needed for fmt + plan later)
+### 1d. Terraform CLI (needed for fmt + plan later)
 
 ```bash
 which terraform
@@ -257,20 +267,20 @@ Note if missing — the refactor will still run but `terraform fmt` and `terrafo
 
 ## Step 2 — Confirm region and resource types
 
-Tell the user:
+Using the resource list retrieved in Step 1b, propose these defaults (verify each name exists in
+the live list before including it):
 
-> I'll import the following resource types from AWS. Add or remove any before I run:
->
-> ```
-> vpc, subnet, igw, instance, sg, route_table
-> ```
+```
+vpc, subnet, igw, ec2_instance, sg, route_table
+```
 
-Use `ask_followup_question` to confirm or adjust. Rebuild the final list and show it before continuing.
+Tell the user the proposed list and use `ask_followup_question` to confirm or adjust.
+Rebuild the final list from the confirmed names and show it before continuing.
 
-Valid Terraformer AWS resource names for reference:
-`vpc`, `subnet`, `igw`, `instance`, `sg`, `route_table`, `eip`, `nat`, `s3`, `iam`,
-`route53Zone`, `route53Record`, `elb`, `alb`, `rds`, `elasticache`, `sns`, `cloudwatch`,
-`secretsmanager`, `ssm`
+**Common resource names** (all verified against v0.8.x):
+`vpc`, `subnet`, `igw`, `ec2_instance`, `sg`, `route_table`, `eip`, `nat`, `s3`, `iam`,
+`route53`, `elb`, `alb`, `rds`, `elasticache`, `sns`, `cloudwatch`, `secretsmanager`, `ssm`,
+`lambda`, `eks`, `ecs`, `ebs`, `kms`, `acm`, `cloudfront`, `dynamodb`, `sqs`, `kinesis`
 
 ## Step 3 — Determine output location
 
@@ -280,27 +290,50 @@ Defaults:
 
 If the user specifies a different location, use that.
 
-## Step 4 — Run Terraformer
+## Step 4 — Bootstrap the AWS provider plugin
+
+Terraformer requires the AWS provider binary to be present before it can run.
+**Always do this step**, not only on error:
+
+```bash
+mkdir -p <generated_dir>
+cat > <generated_dir>/versions.tf << 'EOF'
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = "<region>"
+}
+EOF
+cd <generated_dir> && terraform init -upgrade && cd -
+```
+
+## Step 5 — Run Terraformer
 
 ```bash
 terraformer import aws \
   --resources=<comma-separated-resource-list> \
   --regions=<region> \
-  --output=<generated_dir>
+  --path-output=<generated_dir>
 ```
+
+**Important:** use `--path-output`, not `--output`. The `--output` flag does not exist and will
+cause a silent failure or "unknown output format" error.
 
 Show the full output. If it errors:
-- `NoCredentialProviders` — credentials not set, go back to Step 1b
+- `NoCredentialProviders` — credentials not set, go back to Step 1c
 - `AccessDeniedException` — IAM permissions missing; tell the user which policy is needed
-- Provider plugin error — Terraformer needs the AWS provider binary first:
+- `<resource> not supported service` — the resource name is wrong for this Terraformer build;
+  re-run `terraformer import aws list` and pick the correct name
+- `unknown output format` — you used `--output` instead of `--path-output`; fix the flag and retry
 
-```bash
-mkdir -p <generated_dir> && cd <generated_dir> && terraform init -upgrade && cd -
-```
-
-Then re-run the terraformer command.
-
-## Step 5 — Locate the refactor engine
+## Step 6 — Locate the refactor engine
 
 Look in this order:
 
@@ -321,9 +354,9 @@ If neither exists, tell the user:
 > cd ~/tools/terraform-refactor && ./install.sh
 > ```
 
-## Step 6 — Merge and refactor
+## Step 7 — Merge and refactor
 
-### 6a. Build the merged input file
+### 7a. Build the merged input file
 
 ```bash
 find <generated_dir>/aws -name "*.tf" \
@@ -335,7 +368,7 @@ find <generated_dir>/aws -name "*.tf" \
 
 Tell the user: *"Merged Terraformer resource files into generated.tf."*
 
-### 6b. Detect state directory
+### 7b. Detect state directory
 
 ```bash
 find <generated_dir>/aws -name "terraform.tfstate" | wc -l
@@ -343,21 +376,28 @@ find <generated_dir>/aws -name "terraform.tfstate" | wc -l
 
 If any exist, pass `--state-dir <generated_dir>/aws` to the engine.
 
-### 6c. Run the engine
+### 7c. Run the engine
 
 ```bash
-python3 <engine_path> <generated_dir>/generated.tf <output_dir> --state-dir <generated_dir>/aws
+python3 <engine_path> <generated_dir>/generated.tf <output_dir> [--state-dir <generated_dir>/aws]
 ```
 
 Show the full engine output.
 
-## Step 7 — Format and validate
+## Step 8 — Format and validate
 
 ```bash
 terraform fmt <output_dir>
 ```
 
-Then show the user the validation commands:
+Copy the `versions.tf` created in Step 4 into the output dir (it already has the right provider
+and region):
+
+```bash
+cp <generated_dir>/versions.tf <output_dir>/versions.tf
+```
+
+Then run plan to confirm zero drift:
 
 ```bash
 cd <output_dir>
@@ -367,7 +407,7 @@ terraform plan   # should show: No changes.
 
 Note: `terraform plan` requires valid AWS credentials at plan time as well.
 
-## Step 8 — Report results
+## Step 9 — Report results
 
 Summarise:
 - AWS account and region imported from
@@ -382,8 +422,8 @@ Summarise:
 - If the user only has Terraformer output already (no live import needed), the `tf-refactor`
   skill handles that case directly — suggest it instead
 - The output directory is safe to re-run into — all files are overwritten
-- `provider.tf` is not written by the engine — the user must create their own with the correct
-  region and version constraints before running `terraform plan`
+- Always retrieve the live resource list with `terraformer import aws list` — never assume
+  resource names from memory, as they vary between Terraformer builds
 SKILL_EOF
 
 echo "✓ Skill written:    ${BOB_SKILLS_DIR}/aws-to-iac/SKILL.md"

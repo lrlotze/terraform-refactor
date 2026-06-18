@@ -20,9 +20,24 @@ from parser import parse_hcl, ResourceBlock
 # Load files
 # ---------------------------------------------------------------------------
 
-ROOT = os.path.join(os.path.dirname(__file__), "..")
+ROOT    = os.path.join(os.path.dirname(__file__), "..")
 EXAMPLE = os.path.join(ROOT, "examples", "aws-basic")
 OUTPUT  = os.path.join(EXAMPLE, "output")
+
+_missing = [
+    p for p in [
+        os.path.join(EXAMPLE, "generated.tf"),
+        os.path.join(OUTPUT, "networking.tf"),
+        os.path.join(OUTPUT, "compute.tf"),
+    ]
+    if not os.path.isfile(p)
+]
+if _missing:
+    print("ERROR: fixture files not found — run the pipeline first:")
+    print("  python3 engine/main.py examples/aws-basic/generated.tf examples/aws-basic/output")
+    for p in _missing:
+        print(f"  missing: {p}")
+    sys.exit(1)
 
 with open(os.path.join(EXAMPLE, "generated.tf")) as f:
     original = parse_hcl(f.read())

@@ -52,7 +52,7 @@ def run(input_path: str, output_dir: str, dry_run: bool = False, state_dir: str 
     # ------------------------------------------------------------------
     # Stage 1: Parse
     # ------------------------------------------------------------------
-    print("[1/4] Parsing HCL...")
+    print("[1/6] Parsing HCL...")
     with open(input_path, "r") as f:
         text = f.read()
 
@@ -67,7 +67,7 @@ def run(input_path: str, output_dir: str, dry_run: bool = False, state_dir: str 
     # ------------------------------------------------------------------
     # Stage 2: Noise removal
     # ------------------------------------------------------------------
-    print("\n[2/4] Removing Terraformer noise...")
+    print("\n[2/6] Removing Terraformer noise...")
     hcl = remove_noise(hcl)
     resource_counts_after_noise = _count_resources(hcl)
     remaining = len(hcl.blocks)
@@ -77,7 +77,7 @@ def run(input_path: str, output_dir: str, dry_run: bool = False, state_dir: str 
     # ------------------------------------------------------------------
     # Stage 3: Default value removal
     # ------------------------------------------------------------------
-    print("\n[3/4] Stripping default-valued attributes...")
+    print("\n[3/6] Stripping default-valued attributes...")
     hcl = remove_defaults(hcl)
     # Count total attributes across all resource blocks for reporting
     total_attrs = sum(
@@ -91,7 +91,7 @@ def run(input_path: str, output_dir: str, dry_run: bool = False, state_dir: str 
     # ------------------------------------------------------------------
     # Stage 4: Group
     # ------------------------------------------------------------------
-    print("\n[4/4] Grouping resources...")
+    print("\n[4/6] Grouping resources...")
     groups = group_resources(hcl)
     for group, blocks in sorted(groups.items()):
         resource_blocks = [b for b in blocks if isinstance(b, ResourceBlock)]
@@ -105,7 +105,7 @@ def run(input_path: str, output_dir: str, dry_run: bool = False, state_dir: str 
         print("\n[DRY RUN] Skipping file write.")
         return
 
-    print(f"\n[5/5] Writing output files to {output_dir}...")
+    print(f"\n[5/6] Writing output files to {output_dir}...")
     emit(groups, output_dir)
 
     # ------------------------------------------------------------------

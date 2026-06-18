@@ -66,6 +66,13 @@ def _strip_nested_block(nb: NestedBlock, resource_type: str) -> NestedBlock | No
 # Public API
 # ---------------------------------------------------------------------------
 
+# Attributes removed entirely in AWS provider v5 that Terraformer still emits.
+# Keyed by resource type → set of attribute names to always drop.
+_V5_REMOVED_ATTRS: dict[str, set[str]] = {
+    "aws_vpc": {"enable_classiclink", "enable_classiclink_dns_support"},
+}
+
+
 def remove_defaults(hcl_file: HCLFile) -> HCLFile:
     """
     Strip default-valued attributes from all ResourceBlocks in the HCLFile.
@@ -82,12 +89,29 @@ def remove_defaults(hcl_file: HCLFile) -> HCLFile:
 
         # --- Flat attribute removal ---
         kept_attrs: dict[str, Attribute] = {}
+
+        # For aws_instance: if a cpu_options nested block is present, the top-level
+        # cpu_core_count and cpu_threads_per_core attributes conflict with it under
+        # AWS provider v5 and must be dropped.
+        has_cpu_options = (
+            rtype == "aws_instance"
+            and any(nb.block_type == "cpu_options" for nb in block.nested_blocks)
+        )
+
         for key, attr in block.attributes.items():
 
             # Universal rule: drop 'region' if it matches the provider region
             if key == "region" and provider_region is not None:
                 if str(attr.typed_value) == provider_region:
                     continue  # remove
+
+            # Drop deprecated top-level CPU attrs when cpu_options block is present
+            if has_cpu_options and key in ("cpu_core_count", "cpu_threads_per_core"):
+                continue  # remove
+
+            # Drop attributes removed entirely in AWS provider v5
+            if key in _V5_REMOVED_ATTRS.get(rtype, set()):
+                continue  # remove
 
             if is_default(rtype, key, attr.typed_value):
                 pass  # remove
