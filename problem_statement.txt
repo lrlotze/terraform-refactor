@@ -1,0 +1,19 @@
+Bob’s #0Fans Submission
+
+Problem
+Import tools like Terraformer produce noisy, bloated Terraform files: duplicated provider/terraform blocks, outputs for every resource, hard-coded computed IDs, and many attributes that merely repeat provider defaults. This makes code hard to review, error-prone to maintain, and difficult to validate safely.
+
+Solution (outline)
+
+Parse HCL into a typed model.
+Remove Terraformer noise (duplicate providers, outputs, remote-state data).
+Strip attributes that exactly match provider defaults using an authoritative registry.
+Group resources into logical files (networking, compute, storage, etc.).
+Emit clean .tf files; optionally merge state for immediate terraform plan validation.
+(Optional) Run an LLM audit pass that produces advisory recommendations; the core engine stays deterministic and safe.
+
+Importance / Impact
+
+Preserves infrastructure behavior while making configs readable and maintainable.
+Reduces review friction and risky manual edits — teams can run terraform plan with confidence.
+Enables faster onboarding and safer automation when importing existing cloud resources.
