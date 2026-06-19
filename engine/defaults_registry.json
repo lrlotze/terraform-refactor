@@ -24,7 +24,25 @@
     "azurerm_linux_virtual_machine.flat": "https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/linux_virtual_machine — allow_extension_operations defaults to true, bypass_platform_safety_checks_on_user_schedule_enabled defaults to false, computer_name defaults to name value, disable_password_authentication defaults to true when no admin_password set (false when password is set), encryption_at_host_enabled defaults to false, extensions_time_budget defaults to PT1H30M, patch_assessment_mode defaults to ImageDefault, patch_mode defaults to ImageDefault, priority defaults to Regular, provision_vm_agent defaults to true, secure_boot_enabled defaults to false, vtpm_enabled defaults to false. platform_fault_domain = -1 is a Terraformer sentinel meaning 'not in a scale set'. max_bid_price = -1 is a Terraformer sentinel meaning 'not a Spot VM'. disk_controller_type and vm_agent_platform_updates_enabled are computed/Terraformer-only attributes — all four must be stripped as noise.",
     "azurerm_linux_virtual_machine.os_disk": "https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/linux_virtual_machine#os_disk — caching is required (no default), storage_account_type is required (no default). write_accelerator_enabled defaults to false, disk_size_gb is computed when omitted, secure_vm_disk_encryption_set_id and security_encryption_type are optional.",
     "azurerm_linux_virtual_machine.boot_diagnostics": "storage_account_uri defaults to null (managed storage) when block is present without a URI — https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/linux_virtual_machine#boot_diagnostics",
-    "azurerm_linux_virtual_machine.termination_notification": "enabled is required when block is present; timeout defaults to PT5M — https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/linux_virtual_machine#termination_notification"
+    "azurerm_linux_virtual_machine.termination_notification": "enabled is required when block is present; timeout defaults to PT5M — https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/linux_virtual_machine#termination_notification",
+
+    "aws_security_group": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group — revoke_rules_on_delete defaults to false.",
+    "aws_nat_gateway": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/nat_gateway — connectivity_type defaults to public.",
+    "aws_eip": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eip — vpc is deprecated and removed in provider v5, Terraformer still emits it — __DROP__.",
+    "aws_s3_bucket": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket — force_destroy defaults to false, object_lock_enabled defaults to false.",
+    "aws_iam_role": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role — force_detach_policies defaults to false, max_session_duration defaults to 3600, path defaults to /.",
+    "aws_iam_policy": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy — path defaults to /.",
+    "aws_iam_instance_profile": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_instance_profile — path defaults to /.",
+    "aws_launch_template": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/launch_template — disable_api_stop defaults to false, disable_api_termination defaults to false, ebs_optimized defaults to false, instance_initiated_shutdown_behavior defaults to stop, update_default_version defaults to false.",
+    "aws_autoscaling_group": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/autoscaling_group — capacity_rebalance defaults to false, protect_from_scale_in defaults to false, wait_for_capacity_timeout defaults to 10m.",
+    "aws_lb": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lb — enable_deletion_protection defaults to false, idle_timeout defaults to 60, ip_address_type defaults to ipv4, desync_mitigation_mode defaults to defensive, drop_invalid_header_fields defaults to false. enable_cross_zone_load_balancing intentionally omitted — default differs between ALB (true) and NLB (false).",
+    "aws_alb": "Alias for aws_lb — same defaults apply.",
+    "aws_lb_target_group": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lb_target_group — connection_termination defaults to false, deregistration_delay defaults to 300, lambda_multi_value_headers_enabled defaults to false, load_balancing_algorithm_type defaults to round_robin, load_balancing_anomaly_mitigation defaults to off, proxy_protocol_v2 defaults to false, slow_start defaults to 0, target_type defaults to instance, ip_address_type defaults to ipv4.",
+    "aws_alb_target_group": "Alias for aws_lb_target_group — same defaults apply.",
+    "aws_db_instance": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_instance — apply_immediately defaults to false, auto_minor_version_upgrade defaults to true, backup_retention_period defaults to 0, copy_tags_to_snapshot defaults to false, deletion_protection defaults to false, iam_database_authentication_enabled defaults to false, multi_az defaults to false, performance_insights_enabled defaults to false, publicly_accessible defaults to false, skip_final_snapshot defaults to false, storage_encrypted defaults to false.",
+    "azurerm_windows_virtual_machine": "https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/windows_virtual_machine — mirrors azurerm_linux_virtual_machine defaults with Windows-specific differences: enable_automatic_updates defaults to true, hotpatching_enabled defaults to false, patch_mode defaults to AutomaticByOS. platform_fault_domain = -1 and max_bid_price = -1 are Terraformer sentinels. disk_controller_type and vm_agent_platform_updates_enabled are computed/Terraformer-only — __DROP__.",
+    "azurerm_network_security_group": "https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/network_security_group — no provider-side defaults that Terraformer emits beyond the universal region rule; tags={} is not stripped (user may have intentionally set no tags).",
+    "azurerm_storage_account": "https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_account — access_tier defaults to Hot, cross_tenant_replication_enabled defaults to false (since provider v3.114), default_to_oauth_authentication defaults to false, https_traffic_only_enabled defaults to true, infrastructure_encryption_enabled defaults to false, is_hns_enabled defaults to false, large_file_share_enabled defaults to false, min_tls_version defaults to TLS1_2, nfsv3_enabled defaults to false, public_network_access_enabled defaults to true, sftp_enabled defaults to false, shared_access_key_enabled defaults to true. enable_https_traffic_only is deprecated alias removed in provider v4.0 — __DROP__."
   },
 
   "aws_subnet": {
@@ -121,5 +139,140 @@
     "disk_controller_type": "__DROP__",
     "vm_agent_platform_updates_enabled": "__DROP__",
     "os_disk.write_accelerator_enabled": false
+  },
+
+  "aws_security_group": {
+    "revoke_rules_on_delete": false
+  },
+
+  "aws_nat_gateway": {
+    "connectivity_type": "public"
+  },
+
+  "aws_eip": {
+    "vpc": "__DROP__"
+  },
+
+  "aws_s3_bucket": {
+    "force_destroy": false,
+    "object_lock_enabled": false
+  },
+
+  "aws_iam_role": {
+    "force_detach_policies": false,
+    "max_session_duration": 3600,
+    "path": "/"
+  },
+
+  "aws_iam_policy": {
+    "path": "/"
+  },
+
+  "aws_iam_instance_profile": {
+    "path": "/"
+  },
+
+  "aws_launch_template": {
+    "disable_api_stop": false,
+    "disable_api_termination": false,
+    "ebs_optimized": false,
+    "instance_initiated_shutdown_behavior": "stop",
+    "update_default_version": false
+  },
+
+  "aws_autoscaling_group": {
+    "capacity_rebalance": false,
+    "protect_from_scale_in": false,
+    "wait_for_capacity_timeout": "10m"
+  },
+
+  "aws_lb": {
+    "desync_mitigation_mode": "defensive",
+    "drop_invalid_header_fields": false,
+    "enable_deletion_protection": false,
+    "idle_timeout": 60,
+    "ip_address_type": "ipv4"
+  },
+
+  "aws_alb": {
+    "desync_mitigation_mode": "defensive",
+    "drop_invalid_header_fields": false,
+    "enable_deletion_protection": false,
+    "idle_timeout": 60,
+    "ip_address_type": "ipv4"
+  },
+
+  "aws_lb_target_group": {
+    "connection_termination": false,
+    "deregistration_delay": 300,
+    "ip_address_type": "ipv4",
+    "lambda_multi_value_headers_enabled": false,
+    "load_balancing_algorithm_type": "round_robin",
+    "load_balancing_anomaly_mitigation": "off",
+    "proxy_protocol_v2": false,
+    "slow_start": 0,
+    "target_type": "instance"
+  },
+
+  "aws_alb_target_group": {
+    "connection_termination": false,
+    "deregistration_delay": 300,
+    "ip_address_type": "ipv4",
+    "lambda_multi_value_headers_enabled": false,
+    "load_balancing_algorithm_type": "round_robin",
+    "load_balancing_anomaly_mitigation": "off",
+    "proxy_protocol_v2": false,
+    "slow_start": 0,
+    "target_type": "instance"
+  },
+
+  "aws_db_instance": {
+    "apply_immediately": false,
+    "auto_minor_version_upgrade": true,
+    "backup_retention_period": 0,
+    "copy_tags_to_snapshot": false,
+    "deletion_protection": false,
+    "iam_database_authentication_enabled": false,
+    "multi_az": false,
+    "performance_insights_enabled": false,
+    "publicly_accessible": false,
+    "skip_final_snapshot": false,
+    "storage_encrypted": false
+  },
+
+  "azurerm_windows_virtual_machine": {
+    "allow_extension_operations": true,
+    "bypass_platform_safety_checks_on_user_schedule_enabled": false,
+    "enable_automatic_updates": true,
+    "encryption_at_host_enabled": false,
+    "extensions_time_budget": "PT1H30M",
+    "hotpatching_enabled": false,
+    "patch_assessment_mode": "ImageDefault",
+    "patch_mode": "AutomaticByOS",
+    "priority": "Regular",
+    "provision_vm_agent": true,
+    "secure_boot_enabled": false,
+    "vtpm_enabled": false,
+    "platform_fault_domain": -1,
+    "max_bid_price": -1,
+    "disk_controller_type": "__DROP__",
+    "vm_agent_platform_updates_enabled": "__DROP__",
+    "os_disk.write_accelerator_enabled": false
+  },
+
+  "azurerm_storage_account": {
+    "access_tier": "Hot",
+    "cross_tenant_replication_enabled": false,
+    "default_to_oauth_authentication": false,
+    "enable_https_traffic_only": "__DROP__",
+    "https_traffic_only_enabled": true,
+    "infrastructure_encryption_enabled": false,
+    "is_hns_enabled": false,
+    "large_file_share_enabled": false,
+    "min_tls_version": "TLS1_2",
+    "nfsv3_enabled": false,
+    "public_network_access_enabled": true,
+    "sftp_enabled": false,
+    "shared_access_key_enabled": true
   }
 }
